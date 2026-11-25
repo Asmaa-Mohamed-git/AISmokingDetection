@@ -1,6 +1,80 @@
-@AISmokingDetection_HostAddress = http://localhost:5129
+@host = https://localhost:7288
+@jobId = 00000000-0000-0000-0000-000000000000
 
-GET {{AISmokingDetection_HostAddress}}/weatherforecast/
-Accept: application/json
+### Create a job (staff JWT required) -> 202 Accepted
+POST {{host}}/api/ProcessingJob
+Authorization: Bearer <staff-jwt>
+Content-Type: application/json
 
-###
+{
+  "videoId": "VIDEO-501",
+  "cameraId": 3,
+  "capturedAt": "2026-11-25T08:00:00Z",
+  "videoReference": "videos/VIDEO-501.mp4"
+}
+
+### AI -> status callback (Processing)
+POST {{host}}/api/v1/integrations/ai/jobs/{{jobId}}/status
+X-Api-Key: <ai-inbound-key>
+Content-Type: application/json
+
+{
+  "jobId": "{{jobId}}",
+  "status": "Processing",
+  "updatedAt": "2026-11-25T08:01:00Z"
+}
+
+### AI -> status callback (Failed)
+POST {{host}}/api/v1/integrations/ai/jobs/{{jobId}}/status
+X-Api-Key: <ai-inbound-key>
+Content-Type: application/json
+
+{
+  "jobId": "{{jobId}}",
+  "status": "Failed",
+  "updatedAt": "2026-11-25T08:02:00Z",
+  "errorCode": "DECODE_ERROR",
+  "errorMessage": "Video could not be decoded."
+}
+
+### AI -> final result (with one event)
+POST {{host}}/api/v1/integrations/ai/jobs/{{jobId}}/complete
+X-Api-Key: <ai-inbound-key>
+Content-Type: application/json
+
+{
+  "jobId": "{{jobId}}",
+  "videoId": "VIDEO-501",
+  "status": "Completed",
+  "modelVersion": "1.0",
+  "configVersion": "1.0",
+  "galleryVersion": "1.0",
+  "events": [
+    {
+      "eventId": "7b0f3c4e-3c1a-4d57-9a55-0d3f7a1c2b10",
+      "trackId": "TRACK-10",
+      "eventType": "smoking",
+      "eventScore": 0.95,
+      "startTimeSeconds": 15.5,
+      "endTimeSeconds": 22.8,
+      "identityStatus": "matched_candidate",
+      "participantId": 105,
+      "evidenceReference": "clips/EVENT-001.mp4"
+    }
+  ]
+}
+
+### AI -> final result (valid zero-event case)
+POST {{host}}/api/v1/integrations/ai/jobs/{{jobId}}/complete
+X-Api-Key: <ai-inbound-key>
+Content-Type: application/json
+
+{
+  "jobId": "{{jobId}}",
+  "videoId": "VIDEO-501",
+  "status": "Completed",
+  "modelVersion": "1.0",
+  "configVersion": "1.0",
+  "galleryVersion": "1.0",
+  "events": []
+}

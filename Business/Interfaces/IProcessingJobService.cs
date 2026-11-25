@@ -1,18 +1,18 @@
-﻿
 using AISmokingDetection.DTOs.ProcessingJob;
 
 namespace AISmokingDetection.Business.Interfaces
 {
     public interface IProcessingJobService
     {
-        Task<ProcessingJobResponseDto> CreateJobAsync(CreateProcessingJobDto dto);
+        /// <summary>Creates a Queued job and tries to submit it to the AI service.</summary>
+        Task<ProcessingJobResponseDto> CreateJobAsync(CreateProcessingJobDto dto, CancellationToken ct = default);
 
-        Task<ProcessingJobResponseDto?> GetJobByIdAsync(int id);
+        Task<ProcessingJobResponseDto?> GetJobAsync(Guid jobId, CancellationToken ct = default);
 
-        Task MarkAsProcessingAsync(int id);
+        /// <summary>Retries submission for Queued jobs the AI service never accepted.</summary>
+        Task RetryPendingSubmissionsAsync(CancellationToken ct = default);
 
-        Task CompleteJobAsync(int id);
-
-        Task FailJobAsync(int id, string errorCode);
+        /// <summary>Flags non-terminal submitted jobs that exceeded the timeout. Never assumes success.</summary>
+        Task FlagStuckJobsAsync(CancellationToken ct = default);
     }
 }

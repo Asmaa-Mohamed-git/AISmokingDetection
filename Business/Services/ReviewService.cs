@@ -1,10 +1,10 @@
-﻿using AISmokingDetection.Business.Interfaces;
+using AISmokingDetection.Business.Interfaces;
 using AISmokingDetection.Data;
 using AISmokingDetection.DTOs.ReviewHistory;
 using AISmokingDetection.Model;
 using Microsoft.EntityFrameworkCore;
 
-namespace AISmokingDetection.API.Business.Services
+namespace AISmokingDetection.Business.Services
 {
     public class ReviewService : IReviewService
     {
@@ -17,6 +17,7 @@ namespace AISmokingDetection.API.Business.Services
 
         public async Task<ReviewHistoryResponseDto> CreateReviewAsync(
             int incidentId,
+            int reviewerId,
             CreateReviewDto dto)
         {
             var incident = await _context.Incidents
@@ -55,7 +56,7 @@ namespace AISmokingDetection.API.Business.Services
             var review = new ReviewHistory
             {
                 IncidentId = incidentId,
-                ReviewerId = dto.ReviewerId,
+                ReviewerId = reviewerId,
                 Decision = decision.ToString(),
                 ReviewReason = dto.ReviewReason,
                 ReviewedAt = DateTime.UtcNow

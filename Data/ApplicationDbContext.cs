@@ -1,4 +1,3 @@
-﻿
 using AISmokingDetection.Model;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,12 +23,17 @@ namespace AISmokingDetection.Data
             {
                 entity.HasKey(i => i.IncidentId);
 
-                entity.HasIndex(i => i.EventId)
-                      .IsUnique();
+                // Idempotency key: an AI event is stored at most once.
+                entity.HasIndex(i => i.EventId).IsUnique();
+                entity.HasIndex(i => i.ProcessingJobId);
+
+                entity.Property(i => i.TrackId)
+                      .IsRequired()
+                      .HasMaxLength(100);
 
                 entity.Property(i => i.EventType)
-                      .IsRequired()
-                      .HasMaxLength(50);
+                      .HasConversion<string>()
+                      .HasMaxLength(30);
 
                 entity.Property(i => i.Status)
                       .HasConversion<string>()
@@ -45,6 +49,11 @@ namespace AISmokingDetection.Data
 
                 entity.Property(i => i.ConfidenceScore)
                       .HasPrecision(5, 4);
+
+                entity.HasOne(i => i.ProcessingJob)
+                      .WithMany(p => p.Incidents)
+                      .HasForeignKey(i => i.ProcessingJobId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Evidence>(entity =>
@@ -59,7 +68,7 @@ namespace AISmokingDetection.Data
                       .HasMaxLength(500);
 
                 entity.Property(e => e.AvailabilityStatus)
-                      .IsRequired()
+                      .HasConversion<string>()
                       .HasMaxLength(30);
 
                 entity.HasOne(e => e.Incident)
@@ -72,6 +81,22 @@ namespace AISmokingDetection.Data
             {
                 entity.HasKey(p => p.ProcessingJobId);
 
+                // Public identifier used in all AI callbacks.
+                entity.HasIndex(p => p.JobId).IsUnique();
+                entity.HasIndex(p => p.VideoId);
+                entity.HasIndex(p => new { p.Status, p.UpdatedAtUtc });
+
+                entity.Property(p => p.VideoId)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(p => p.SchemaVersion)
+                      .IsRequired()
+                      .HasMaxLength(20);
+
+                entity.Property(p => p.VideoReference)
+                      .HasMaxLength(500);
+
                 entity.Property(p => p.Status)
                       .HasConversion<string>()
                       .HasMaxLength(30);
@@ -80,16 +105,13 @@ namespace AISmokingDetection.Data
                       .IsRequired()
                       .HasMaxLength(50);
 
-                entity.Property(p => p.ModelVersion)
-                      .HasMaxLength(100);
+                entity.Property(p => p.ModelVersion).HasMaxLength(100);
+                entity.Property(p => p.ConfigVersion).HasMaxLength(100);
+                entity.Property(p => p.GalleryVersion).HasMaxLength(100);
 
-                entity.Property(p => p.ErrorCode)
-                      .HasMaxLength(100);
-
-                entity.HasOne(p => p.Incident)
-                      .WithMany(i => i.ProcessingJobs)
-                      .HasForeignKey(p => p.IncidentId)
-                      .OnDelete(DeleteBehavior.Restrict);
+                entity.Property(p => p.ErrorCode).HasMaxLength(100);
+                entity.Property(p => p.ErrorMessage).HasMaxLength(500);
+                entity.Property(p => p.LastSubmissionError).HasMaxLength(500);
             });
 
             modelBuilder.Entity<ReviewHistory>(entity =>

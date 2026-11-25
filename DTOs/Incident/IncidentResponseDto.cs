@@ -1,5 +1,4 @@
-﻿using AISmokingDetection.DTOs.Evidence;
-using AISmokingDetection.DTOs.ProcessingJob;
+using AISmokingDetection.DTOs.Evidence;
 using AISmokingDetection.Model;
 
 namespace AISmokingDetection.DTOs.Incident
@@ -10,11 +9,23 @@ namespace AISmokingDetection.DTOs.Incident
 
         public Guid EventId { get; set; }
 
-        public int CameraId { get; set; }
+        // Public job identifier and source video.
+        public Guid JobId { get; set; }
 
-        public int ParticipantId { get; set; }
+        public string VideoId { get; set; } = string.Empty;
 
-        public string EventType { get; set; } = string.Empty;
+        public string TrackId { get; set; } = string.Empty;
+
+        public int? CameraId { get; set; }
+
+        // Candidate only; null unless identityStatus is matched_candidate.
+        public int? ParticipantId { get; set; }
+
+        public EventType EventType { get; set; }
+
+        public double StartTimeSeconds { get; set; }
+
+        public double EndTimeSeconds { get; set; }
 
         public IncidentStatus Status { get; set; }
 
@@ -29,7 +40,5 @@ namespace AISmokingDetection.DTOs.Incident
         public DateTime UpdatedAt { get; set; }
 
         public List<EvidenceResponseDto> Evidences { get; set; } = new();
-
-        public List<ProcessingJobResponseDto> ProcessingJobs { get; set; } = new();
     }
 }
