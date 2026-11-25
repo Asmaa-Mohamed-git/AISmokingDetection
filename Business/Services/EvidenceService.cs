@@ -1,49 +1,31 @@
-﻿using AISmokingDetection.Business.Interfaces;
-using AISmokingDetection.DTOs.Evidence;
+using AISmokingDetection.Business.Interfaces;
 using AISmokingDetection.Data;
+using AISmokingDetection.DTOs.Evidence;
 using AISmokingDetection.Model;
 using Microsoft.EntityFrameworkCore;
 
-namespace AISmokingDetection.API.Business.Services
+namespace AISmokingDetection.Business.Services
 {
     public class EvidenceService : IEvidenceService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IEvidenceStorage _storage;
+        private readonly ILogger<EvidenceService> _logger;
 
-        public EvidenceService(ApplicationDbContext context)
+        public EvidenceService(
+            ApplicationDbContext context,
+            IEvidenceStorage storage,
+            ILogger<EvidenceService> logger)
         {
             _context = context;
+            _storage = storage;
+            _logger = logger;
         }
 
-        public async Task<EvidenceResponseDto> CreateEvidenceAsync(
-            CreateEvidenceDto dto)
-        {
-            bool incidentExists = await _context.Incidents
-                .AnyAsync(i => i.IncidentId == dto.IncidentId);
-
-            if (!incidentExists)
-                throw new KeyNotFoundException("Incident not found.");
-
-            var evidence = new Evidence
-            {
-                IncidentId = dto.IncidentId,
-                EvidenceType = dto.EvidenceType,
-                StorageReference = dto.StorageReference,
-                AvailabilityStatus = dto.AvailabilityStatus,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Evidences.Add(evidence);
-
-            await _context.SaveChangesAsync();
-
-            return MapToResponseDto(evidence);
-        }
-
-        public async Task<List<EvidenceResponseDto>> GetEvidenceByIncidentIdAsync(
-            int incidentId)
+        public async Task<List<EvidenceResponseDto>> GetEvidenceByIncidentIdAsync(int incidentId)
         {
             var evidences = await _context.Evidences
+                .AsNoTracking()
                 .Where(e => e.IncidentId == incidentId)
                 .ToListAsync();
 
@@ -53,12 +35,42 @@ namespace AISmokingDetection.API.Business.Services
         public async Task<EvidenceResponseDto?> GetEvidenceByIdAsync(Guid id)
         {
             var evidence = await _context.Evidences
+                .AsNoTracking()
                 .FirstOrDefaultAsync(e => e.EvidenceId == id);
 
-            if (evidence == null)
-                return null;
+            return evidence == null ? null : MapToResponseDto(evidence);
+        }
 
-            return MapToResponseDto(evidence);
+        public async Task<EvidenceStream> OpenContentAsync(Guid id, CancellationToken ct = default)
+        {
+            var evidence = await _context.Evidences.FirstOrDefaultAsync(e => e.EvidenceId == id, ct)
+                           ?? throw new KeyNotFoundException("Evidence not found.");
+
+            if (string.IsNullOrWhiteSpace(evidence.StorageReference))
+                throw new KeyNotFoundException("Evidence content is not available.");
+
+            var content = await _storage.OpenReadAsync(evidence.StorageReference, ct);
+
+            if (content == null)
+            {
+                // Keep the incident distinguishable from accessible evidence.
+                if (evidence.AvailabilityStatus != EvidenceAvailability.Unavailable)
+                {
+                    evidence.AvailabilityStatus = EvidenceAvailability.Unavailable;
+                    await _context.SaveChangesAsync(ct);
+                    _logger.LogWarning("Evidence {EvidenceId} content could not be opened; marked unavailable.", id);
+                }
+
+                throw new KeyNotFoundException("Evidence content is not available.");
+            }
+
+            if (evidence.AvailabilityStatus != EvidenceAvailability.Available)
+            {
+                evidence.AvailabilityStatus = EvidenceAvailability.Available;
+                await _context.SaveChangesAsync(ct);
+            }
+
+            return content;
         }
 
         private static EvidenceResponseDto MapToResponseDto(Evidence evidence)
@@ -68,7 +80,6 @@ namespace AISmokingDetection.API.Business.Services
                 EvidenceId = evidence.EvidenceId,
                 IncidentId = evidence.IncidentId,
                 EvidenceType = evidence.EvidenceType,
-                StorageReference = evidence.StorageReference,
                 AvailabilityStatus = evidence.AvailabilityStatus,
                 CreatedAt = evidence.CreatedAt
             };

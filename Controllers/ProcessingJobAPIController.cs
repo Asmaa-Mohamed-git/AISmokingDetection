@@ -1,36 +1,39 @@
-﻿using AISmokingDetection.Business.Interfaces;
+using AISmokingDetection.Business.Interfaces;
 using AISmokingDetection.DTOs.ProcessingJob;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AISmokingDetection.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ProcessingJobController : ControllerBase
     {
         private readonly IProcessingJobService _processingJobService;
 
-        public ProcessingJobController(
-            IProcessingJobService processingJobService)
+        public ProcessingJobController(IProcessingJobService processingJobService)
         {
             _processingJobService = processingJobService;
         }
 
+        /// <summary>Creates a job (Queued) and submits it to the AI service. Returns 202.</summary>
         [HttpPost]
-        public async Task<IActionResult> CreateJob(CreateProcessingJobDto dto)
+        public async Task<IActionResult> CreateJob(
+            [FromBody] CreateProcessingJobDto dto, CancellationToken ct)
         {
-            var result = await _processingJobService.CreateJobAsync(dto);
+            var result = await _processingJobService.CreateJobAsync(dto, ct);
 
-            return CreatedAtAction(
-                nameof(GetJobById),
-                new { id = result.ProcessingJobId },
+            return AcceptedAtAction(
+                nameof(GetJob),
+                new { jobId = result.JobId },
                 result);
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetJobById(int id)
+        [HttpGet("{jobId:guid}")]
+        public async Task<IActionResult> GetJob(Guid jobId, CancellationToken ct)
         {
-            var result = await _processingJobService.GetJobByIdAsync(id);
+            var result = await _processingJobService.GetJobAsync(jobId, ct);
 
             if (result == null)
                 return NotFound();
@@ -38,30 +41,7 @@ namespace AISmokingDetection.Controllers
             return Ok(result);
         }
 
-        [HttpPatch("{id:int}/start")]
-        public async Task<IActionResult> StartJob(int id)
-        {
-            await _processingJobService.MarkAsProcessingAsync(id);
-
-            return Ok(new { message = "Job started successfully." });
-        }
-
-        [HttpPatch("{id:int}/complete")]
-        public async Task<IActionResult> CompleteJob(int id)
-        {
-            await _processingJobService.CompleteJobAsync(id);
-
-            return Ok(new { message = "Job completed successfully." });
-        }
-
-        [HttpPatch("{id:int}/fail")]
-        public async Task<IActionResult> FailJob(
-            int id,
-            [FromBody] string errorCode)
-        {
-            await _processingJobService.FailJobAsync(id, errorCode);
-
-            return Ok(new { message = "Job failed." });
-        }
+        // Status changes (start / complete / fail) are no longer exposed here:
+        // they arrive only through the authenticated AI callback endpoints.
     }
 }

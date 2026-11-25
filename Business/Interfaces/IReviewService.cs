@@ -1,4 +1,4 @@
-﻿using AISmokingDetection.DTOs.ReviewHistory;
+using AISmokingDetection.DTOs.ReviewHistory;
 
 namespace AISmokingDetection.Business.Interfaces
 {
@@ -6,6 +6,7 @@ namespace AISmokingDetection.Business.Interfaces
     {
         Task<ReviewHistoryResponseDto> CreateReviewAsync(
             int incidentId,
+            int reviewerId,
             CreateReviewDto dto);
 
         Task<List<ReviewHistoryResponseDto>> GetReviewsByIncidentIdAsync(
